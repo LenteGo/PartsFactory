@@ -15,7 +15,7 @@ namespace PartsFactory
      * category production multiplier
      * parts list
      */
-    public class ModulePartFactory : ModuleInventoryPart, IResourceConsumer, IOverheatDisplay
+    public class ModulePartFactory : PartModule, IResourceConsumer, IOverheatDisplay
     {
         private const string NominalStatus = "Nominal";
         private const string OverheatStatus = "Overheated";
@@ -33,12 +33,6 @@ namespace PartsFactory
         public double inputReceived = 1d;
         private bool _lackingResources;
         private IResourceBroker _resBroker;
-
-        [UI_Grid(columnCount = 3)]
-        [KSPField(guiActive = false, guiActiveUnfocused = true, guiName = "#autoLOC_8320000", unfocusedRange = 5f)]
-        public int InventorySlots = 1;
-
-        private UI_Grid grid;
 
         List<string> partGroupsIdList = new List<String>();
         private bool _initializationDone;
@@ -72,7 +66,7 @@ namespace PartsFactory
             guiName = "materialRequired")]
         public float materialRequired;
 
-        [KSPField] public int crewsRequired = 0;
+        [KSPField] public int crewsRequired;
 
         [KSPField(isPersistant = true)] public float overheatTemperature = 500;
 
@@ -279,11 +273,6 @@ namespace PartsFactory
             }
 
             protoPart.mass = 0;
-            grid.inventoryPart.StoreCargoPartAtSlot(protoPart, 0);
-            grid.inventoryPart.storedParts[0].quantity = blueprint.quantity;
-            ((UI_Grid) grid.inventoryPart.Fields["InventorySlots"].uiControlEditor).updateSlotItems = true;
-            GameEvents.onModuleInventorySlotChanged.Fire(grid.inventoryPart, 0);
-            GameEvents.onModuleInventoryChanged.Fire(grid.inventoryPart);
         }
 
         private void UpdateUiElements()
@@ -328,69 +317,6 @@ namespace PartsFactory
             UpdateUiTexts();
         }
 
-        public bool AbleToPlaceParts
-        {
-            get
-            {
-                Debug.Log("********************************* AbleToPlaceParts");
-                return false;
-            }
-        }
-
-        public bool InventoryIsFull
-        {
-            get
-            {
-                Debug.Log("********************************* InventoryIsFull");
-                return true;
-            }
-        }
-
-        private void OnModuleInventoryChanged(ModuleInventoryPart moduleInventory)
-        {
-            Debug.Log("********************************* OnModuleInventoryChanged");
-            if (moduleInventory != null)
-            {
-                Debug.Log("moduleInventory " + moduleInventory.name);
-            }
-        }
-
-        private void VesselEditorPartHighlighter(Part p)
-        {
-            Debug.Log("********************************* VesselEditorPartHighlighter");
-            if (p != null)
-            {
-                Debug.Log("PART " + p.name);
-            }
-        }
-
-        private void onPartActionUIOpened(Part p)
-        {
-            Debug.Log("********************************* onPartActionUIOpened");
-            if (p != null)
-            {
-                Debug.Log("PART " + p.name);
-            }
-        }
-
-        private void OnEditorPartEvent(ConstructionEventType evt, Part p)
-        {
-            Debug.Log("********************************* onPartActionUIOpened");
-            if (p != null)
-            {
-                Debug.Log("PART " + p.name);
-            }
-        }
-
-        private void OnPartPurchased(AvailablePart part)
-        {
-            Debug.Log("********************************* OnPartPurchased ");
-            if (part != null)
-            {
-                Debug.Log("PART " + part.name);
-            }
-        }
-
         public void UpdateUiTexts()
         {
             if (this._lackingResources)
@@ -404,30 +330,9 @@ namespace PartsFactory
             }
         }
 
-        private void RenderGrid()
-        {
-            this.grid = this.Fields["InventorySlots"].uiControlFlight as UI_Grid;
-            this.Fields["InventorySlots"].guiActive = false;
-            this.grid.inventoryPart = this;
-            this.grid.updateSlotItems = false;
-            this.grid.controlEnabled = false;
-            Debug.Log("*********************************1");
-            Debug.Log(this.grid.inventoryPart.ClassName);
-            foreach (BaseEvent baseEvent in this.Events)
-            {
-                Debug.Log("************** event");
-                Debug.Log(baseEvent.name);
-                Debug.Log(baseEvent.guiActiveEditor);
-                Debug.Log(baseEvent.active);
-                Debug.Log(baseEvent.guiIcon);
-            }
-            Debug.Log("*********************************2");
-        }
-
         public override void OnStart(StartState state)
         {
             base.OnStart(state);
-            RenderGrid();
             SetBlueprint(currentBlueprint);
             this.resHandler.inputResources.Clear();
             foreach (ResourceRatio ratio in resourcesList)
