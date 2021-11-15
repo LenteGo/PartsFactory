@@ -34,7 +34,7 @@ namespace PartsFactory
         private bool _lackingResources;
         private IResourceBroker _resBroker;
 
-        List<string> partGroupsIdList = new List<String>();
+        private readonly List<string> _partGroupsIdList = new List<String>();
         private bool _initializationDone;
 
         [KSPField(guiActive = true,
@@ -55,6 +55,11 @@ namespace PartsFactory
         public bool isOnProduction;
 
         [KSPField(isPersistant = true)] public string status = NominalStatus;
+
+        [KSPField(guiActive = ShowDebug,
+            isPersistant = false,
+            guiName = "Require resources")]
+        public String resourceStatus;
 
         [KSPField(guiActive = ShowDebug,
             isPersistant = true,
@@ -146,7 +151,6 @@ namespace PartsFactory
             }
             else
             {
-                // Debug.Log("No free storage");
                 this.status = "No free storage";
                 SetProductionState(false);
                 ScreenMessages.PostScreenMessage("No free storage");
@@ -234,19 +238,16 @@ namespace PartsFactory
         {
             base.OnActive();
             UpdatePartsCache(this.vessel);
-            Debug.Log("gaga OnActive");
         }
 
         public override void OnInitialize()
         {
             base.OnInitialize();
-            Debug.Log("gaga OnInitialize");
         }
 
 
         public override void OnAwake()
         {
-            Debug.Log("gaga OnAwake");
             base.OnAwake();
 
             if (this.thermalEfficiency == null)
@@ -265,14 +266,14 @@ namespace PartsFactory
 
         public void SetBlueprint(PartBlueprint blueprint)
         {
-            if (currentBlueprint == null) return;
-            ProtoPartSnapshot protoPart = blueprint.GETProtoPart();
-            foreach (var resource in protoPart.resources)
+            if (blueprint == null) return;
+            if (currentBlueprint == null || !currentBlueprint.blueprintName.Equals(blueprint.blueprintName))
             {
-                resource.amount = 0;
+                currentBlueprint = blueprint;
+                materialProduced = 0;
+                materialRequired = blueprint.mass * blueprint.quantity * 1000;
             }
 
-            protoPart.mass = 0;
         }
 
         private void UpdateUiElements()
@@ -280,7 +281,7 @@ namespace PartsFactory
             if ((UnityEngine.Object) part.PartActionWindow != (UnityEngine.Object) null &&
                 part.PartActionWindow.parameterGroups != null)
             {
-                foreach (String groupId in partGroupsIdList)
+                foreach (String groupId in _partGroupsIdList)
                 {
                     if (part.PartActionWindow.parameterGroups.TryGetValue(groupId, out var windowActionGroup))
                     {
@@ -307,8 +308,7 @@ namespace PartsFactory
                     startEvent.guiName = StartTitle + " " + currentBlueprint.displayName;
                 }
             }
-
-
+            this.Fields["resourceStatus"].guiActive = currentBlueprint != null;
             foreach (BaseEvent kspEvent in _productionEvents)
             {
                 kspEvent.guiActive = !isOnProduction;
@@ -319,6 +319,25 @@ namespace PartsFactory
 
         public void UpdateUiTexts()
         {
+            if (currentBlueprint != null)
+            {
+                this.resourceStatus = "";
+                foreach (ResourceRatio ratio in resourcesList)
+                {
+                    this.resourceStatus += "\n";
+                    double required = currentBlueprint.mass * currentBlueprint.quantity * 1000 * ratio.Ratio;
+                    if (this.isOnProduction)
+                    {
+                        double complete = materialRequired > 1 ? required * materialProduced / materialRequired : 0;
+                        this.resourceStatus += ratio.ResourceName + " " + (int) complete + "/" + (int) required;
+                    }
+                    else
+                    {
+                        this.resourceStatus += ratio.ResourceName + " " + (int) required;
+                    }
+                }
+            }
+
             if (this._lackingResources)
             {
                 this.displayStatus = "No enough resources";
@@ -352,7 +371,7 @@ namespace PartsFactory
                 if (partInstance != null && ResearchAndDevelopment.PartTechAvailable(partInstance))
                 {
                     String groupId = partInstance.category.ToString().Trim().ToLower().Replace(" ", "_");
-                    partGroupsIdList.Add(groupId);
+                    _partGroupsIdList.Add(groupId);
                     KSPEvent productEventUi = new KSPEvent()
                     {
                         guiActive = true,
@@ -366,8 +385,7 @@ namespace PartsFactory
                     BaseEvent productionEvent = new BaseEvent(this.Events, productEventUi.name, () =>
                     {
                         PartBlueprint blueprint = new PartBlueprint(partInstance.name, "", 1);
-                        currentBlueprint = blueprint;
-                        SetBlueprint(currentBlueprint);
+                        SetBlueprint(blueprint);
                         UpdateUiElements();
                     }, productEventUi);
                     this.Events.Add(productionEvent);
@@ -378,7 +396,6 @@ namespace PartsFactory
 
         public override void OnStartFinished(StartState state)
         {
-            Debug.Log("gaga OnStartFinished");
             base.OnStartFinished(state);
             if (isOnProduction && Planetarium.GetUniversalTime() > lastUpdateTime)
             {
@@ -445,7 +462,6 @@ namespace PartsFactory
                 double used = this.ResBroker.RequestResource(this.part, definition.id,
                     resourcesAmount * ratio.Ratio * efficiencyMultiplier, deltaMaterial,
                     ResourceFlowMode.ALL_VESSEL);
-                Debug.Log("Factory resources used: " + used);
             }
 
             if (isCycleProduction)
@@ -560,7 +576,6 @@ namespace PartsFactory
 
         public override void OnLoad(ConfigNode node)
         {
-            Debug.Log("gaga OnLoad");
             base.OnLoad(node);
             LoadResources(node);
             LoadDefaultParts(node);
@@ -569,7 +584,6 @@ namespace PartsFactory
 
         public override void OnSave(ConfigNode node)
         {
-            Debug.Log("gaga OnSave");
             SaveResources(node);
             SaveDefaultParts(node);
             SaveBlueprint(node, "currentBlueprint", currentBlueprint);
